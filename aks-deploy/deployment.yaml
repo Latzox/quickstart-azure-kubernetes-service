@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aks-demo
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: aks-demo
+  template:
+    metadata:
+      labels:
+        app: aks-demo
+    spec:
+      containers:
+      - name: aks-demo
+        image: latzox.azurecr.io/quickstart-aks-py:latest
+        ports:
+          - containerPort: 5000
