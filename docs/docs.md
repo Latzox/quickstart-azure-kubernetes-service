@@ -34,7 +34,7 @@ Pick the scope and perform a quick validation and preview with what-if. If every
 
 Now run the following command to import the aks credentials:
 
-```
+```powershell
 Import-AzAksCredential -ResourceGroupName rg-k8s-dev-001 -Name latzok8s
 ```
 
@@ -79,7 +79,7 @@ image: <yourAcrName.azurecr.io>/quickstart-aks-py:latest
 
 ### Create the Kubernetes deployment
 
-```
+```bash
 kubectl apply -f deployment.yaml
 ```
 
