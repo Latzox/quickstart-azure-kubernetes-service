@@ -50,7 +50,7 @@ jobs:
             {
               "acrSubId": "${{ secrets.ENTRA_SUBSCRIPTION_ID_SS }}",
               "aksSubId": "${{ secrets.ENTRA_SUBSCRIPTION_ID }}",
-              "sshRSAPublicKey": "Test"
+              "sshRSAPublicKey": ${{ secrets.PUBLIC_SSH_KEY }}
             }
   Prod:
     runs-on: ubuntu-latest
@@ -73,12 +73,6 @@ jobs:
         run: |
           az account set --subscription ${{ secrets.ENTRA_SUBSCRIPTION_ID }}
 
-      - name: Set Azure Subscription
-        run: |
-          az group create --name "rg-k8s-dev-001" --location "switzerlandnorth"
-          ssh_key_output=$(az sshkey create --name "ssh-k8s-dev-001" --resource-group "rg-k8s-dev-001")
-          echo "$ssh_key_output" | jq -r '.publicKey' >> $GITHUB_ENV
-
       - name: Prod Deployment
         uses: azure/bicep-deploy@bed0974555908ee0609c2b50aceb984cb50ea68b
         with:
@@ -93,5 +87,5 @@ jobs:
             {
               "acrSubId": "${{ secrets.ENTRA_SUBSCRIPTION_ID_SS }}",
               "aksSubId": "${{ secrets.ENTRA_SUBSCRIPTION_ID }}",
-              "sshRSAPublicKey": ${{ env.PUBLIC_KEY }}
+              "sshRSAPublicKey": ${{ secrets.PUBLIC_SSH_KEY }}
             }
