@@ -1,0 +1,100 @@
+name: Infra Deployment
+
+run-name: >
+  ${{ github.workflow }}: ${{ github.event_name }} for ${{ github.ref_name }} by @${{ github.actor }}
+
+on:
+  push:
+    paths:
+      - 'azure-deploy/**'
+  workflow_dispatch:
+
+permissions: 
+  id-token: write
+
+env:
+  AZURE_REGION: 'switzerlandnorth'
+
+jobs:
+
+  Prerequisites:
+    runs-on: ubuntu-latest
+    environment: build
+
+  Preview:
+    runs-on: ubuntu-latest
+    environment: preview
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Azure CLI Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.ENTRA_CLIENT_ID }}
+          tenant-id: ${{ secrets.ENTRA_TENANT_ID }}
+          subscription-id: ${{ secrets.ENTRA_SUBSCRIPTION_ID }}
+
+      - name: Set Azure Subscription
+        run: |
+          az account set --subscription ${{ secrets.ENTRA_SUBSCRIPTION_ID }}
+
+      - name: Preview Deployment
+        uses: azure/bicep-deploy@bed0974555908ee0609c2b50aceb984cb50ea68b
+        with:
+          type: deployment
+          operation: whatIf
+          name: ${{ github.run_id }}
+          location: ${{ env.AZURE_REGION }}
+          scope: subscription
+          subscription-id: ${{ secrets.ENTRA_SUBSCRIPTION_ID }}
+          template-file: azure-deploy/main.bicep
+          parameters: |
+            {
+              "acrSubId": "${{ secrets.ENTRA_SUBSCRIPTION_ID_SS }}",
+              "aksSubId": "${{ secrets.ENTRA_SUBSCRIPTION_ID }}"
+              "sshRSAPublicKey": "Test"
+            }
+  Prod:
+    runs-on: ubuntu-latest
+    environment: production
+    if: github.ref == 'refs/heads/main'
+    needs: Preview
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Azure CLI Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Set Azure Subscription
+        run: |
+          az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Set Azure Subscription
+        run: |
+          az group create --name "rg-k8s-dev-001" --location "switzerlandnorth"
+          az sshkey create --name "ssh-k8s-dev-001" --resource-group "rg-k8s-dev-001"
+
+      - name: Prod Deployment
+        uses: azure/bicep-deploy@bed0974555908ee0609c2b50aceb984cb50ea68b
+        with:
+          type: deployment
+          operation: create
+          name: ${{ github.run_id }}
+          location: ${{ env.AZURE_REGION }}
+          scope: subscription
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          template-file: azure-deploy/main.bicep
+          parameters: |
+            {
+              "acrSubId": "${{ secrets.ENTRA_SUBSCRIPTION_ID_SS }}",
+              "aksSubId": "${{ secrets.ENTRA_SUBSCRIPTION_ID }}"
+              "sshRSAPublicKey": "Test"
+            }
