@@ -1,8 +1,22 @@
+targetScope = 'subscription'
+
+@description('The name of the resource group.')
+param aksRgName string = 'rg-k8s-dev-001'
+
+@description('The name of the resource group.')
+param acrRgName string = 'rg-acr-prod-001'
+
+@description('The subscription ID of the Azure Kubernetes Service.')
+param aksSubId string = '00000000-0000-0000-0000-000000000000'
+
+@description('The resource group ID of the Azure Kubernetes Service.')
+param acrSubId string = '00000000-0000-0000-0000-000000000000'
+
 @description('The name of the Managed Cluster resource.')
 param clusterName string = 'latzok8s'
 
 @description('The location of the Managed Cluster resource.')
-param location string = resourceGroup().location
+param location string = 'switzerlandnorth'
 
 @description('Optional DNS prefix to use with hosted Kubernetes API server FQDN.')
 param dnsPrefix string = 'latzok8s'
@@ -24,38 +38,39 @@ param agentVMSize string = 'Standard_B2s'
 param linuxAdminUsername string = 'latzo'
 
 @description('Configure all linux machines with the SSH RSA public key string. Your key should include three parts, for example \'ssh-rsa AAAAB...snip...UcyupgH azureuser@linuxvm\'')
-param sshRSAPublicKey string = 'DummySSHKey'
+param sshRSAPublicKey string = ''
 
-resource aks 'Microsoft.ContainerService/managedClusters@2024-08-01' = {
-  name: clusterName
+@description('Role definition ID for ACR pull role.')
+param roleDefinitionId string = subscriptionResourceId(
+  'Microsoft.Authorization/roleDefinitions',
+  '7f951dda-4ed3-4680-a7ca-43fe172d538d'
+)
+
+resource rg 'Microsoft.Resources/resourceGroups@2024-07-01' = {
+  name: aksRgName
   location: location
-  identity: {
-    type: 'SystemAssigned'
-  }
-  properties: {
+}
+
+module aks 'aks.bicep' = {
+  name: 'deploy-aks'
+  scope: resourceGroup(aksSubId, aksRgName)
+  params: {
+    clusterName: clusterName
+    location: location
     dnsPrefix: dnsPrefix
-    agentPoolProfiles: [
-      {
-        name: 'agentpool'
-        osDiskSizeGB: osDiskSizeGB
-        count: agentCount
-        vmSize: agentVMSize
-        osType: 'Linux'
-        mode: 'System'
-        osSKU: 'AzureLinux'
-      }
-    ]
-    linuxProfile: {
-      adminUsername: linuxAdminUsername
-      ssh: {
-        publicKeys: [
-          {
-            keyData: sshRSAPublicKey
-          }
-        ]
-      }
-    }
+    osDiskSizeGB: osDiskSizeGB
+    agentCount: agentCount
+    agentVMSize: agentVMSize
+    linuxAdminUsername: linuxAdminUsername
+    sshRSAPublicKey: sshRSAPublicKey
   }
 }
 
-output controlPlaneFQDN string = aks.properties.fqdn
+module roleAssignment 'role.bicep' = {
+  name: 'deploy-roleAssignment'
+  scope: resourceGroup(acrSubId, acrRgName)
+  params: {
+    roleDefinitionId: roleDefinitionId
+    aksIdentityPrincipalId: aks.outputs.aksIdentityObjectId
+  }
+}
