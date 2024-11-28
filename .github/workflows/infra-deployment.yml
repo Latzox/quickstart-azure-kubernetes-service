@@ -49,7 +49,7 @@ jobs:
           parameters: |
             {
               "acrSubId": "${{ secrets.ENTRA_SUBSCRIPTION_ID_SS }}",
-              "aksSubId": "${{ secrets.ENTRA_SUBSCRIPTION_ID }}"
+              "aksSubId": "${{ secrets.ENTRA_SUBSCRIPTION_ID }}",
               "sshRSAPublicKey": "Test"
             }
   Prod:
@@ -91,6 +91,6 @@ jobs:
           parameters: |
             {
               "acrSubId": "${{ secrets.ENTRA_SUBSCRIPTION_ID_SS }}",
-              "aksSubId": "${{ secrets.ENTRA_SUBSCRIPTION_ID }}"
+              "aksSubId": "${{ secrets.ENTRA_SUBSCRIPTION_ID }}",
               "sshRSAPublicKey": "Test"
             }
