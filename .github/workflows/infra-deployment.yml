@@ -17,10 +17,6 @@ env:
 
 jobs:
 
-  Prerequisites:
-    runs-on: ubuntu-latest
-    environment: build
-
   Preview:
     runs-on: ubuntu-latest
     environment: preview
