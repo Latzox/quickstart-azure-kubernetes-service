@@ -15,7 +15,9 @@ param (
     [string]$SshKeyName = "k8s-sshkey-dev-001",
     [string]$GitHubOrg = "<GitHubOrg>",
     [string]$RepoName = "<RepoName>",
-    [string]$EnvironmentName = "<EnvironmentName>"
+    [string]$EnvironmentName = "<EnvironmentName>",
+    [string]$repositoryName = "<your-repo-name>" # Replace with your repository name (e.g., 'username/repo')
+
 )
 
 # Helper function to set the subscription context
@@ -107,6 +109,32 @@ try {
     Write-Host "'AcrPush' role assigned successfully." -ForegroundColor Green
 } catch {
     Write-Error "Failed to assign roles: $_"
+    exit 1
+}
+
+# Step 6: Create the GitHub Actions Secrets
+try {
+
+    # Define the secrets and their values
+    # Replace "<value>" with the actual secret values
+    $secrets = @{
+        "ENTRA_CLIENT_ID"         = $sp.AppId
+        "ENTRA_SUBSCRIPTION_ID"   = $AksSubscriptionId
+        "ENTRA_SUBSCRIPTION_ID_SS"= $AcrSubscriptionId
+        "ENTRA_TENANT_ID"         = (Get-AzContext).Tenant.Id
+    }
+
+    # Iterate through each secret and create it using the GitHub CLI
+    foreach ($secretName in $secrets.Keys) {
+        $secretValue = $secrets[$secretName]
+        Write-Host "Creating secret: $secretName"
+        gh secret set $secretName --body $secretValue --repo $repositoryName
+    }
+
+    Write-Host "All secrets have been created successfully."
+} 
+catch {
+    Write-Error "Failed to create secrets in github: $_"
     exit 1
 }
 
