@@ -14,7 +14,7 @@ env:
   AZURE_CONTAINER_REGISTRY: "latzox"
   CONTAINER_NAME: "quickstart-aks-py"
   RESOURCE_GROUP: "rg-k8s-dev-001"
-  CLUSTER_NAME: "your-cluster-name"
+  CLUSTER_NAME: "latzok8s"
   DEPLOYMENT_MANIFEST_PATH: "./aks-deploy/deployment.yaml"
   SERVICE_MANIFEST_PATH: "./aks-deploy/service.yaml"
 
