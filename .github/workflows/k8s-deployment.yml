@@ -11,10 +11,10 @@ on:
   workflow_dispatch:
 
 env:
-  AZURE_CONTAINER_REGISTRY: "latzox"
-  CONTAINER_NAME: "quickstart-aks-py"
-  RESOURCE_GROUP: "rg-k8s-dev-001"
-  CLUSTER_NAME: "latzok8s"
+  AZURE_CONTAINER_REGISTRY: ${{ vars.AZURE_ACR_NAME }}
+  CONTAINER_NAME: ${{ vars.DOCKER_IMAGE_NAME }}
+  RESOURCE_GROUP: ${{ vars.AKS_RG }}
+  CLUSTER_NAME: ${{ vars.AKS_CLUSTER_NAME }}
   DEPLOYMENT_MANIFEST_PATH: "./aks-deploy/deployment.yaml"
   SERVICE_MANIFEST_PATH: "./aks-deploy/service.yaml"
 
