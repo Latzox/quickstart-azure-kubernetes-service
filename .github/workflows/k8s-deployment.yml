@@ -25,6 +25,7 @@ jobs:
       contents: read
       id-token: write
     runs-on: ubuntu-latest
+    environment: aks-prod
     steps:
       - uses: actions/checkout@v4
 
