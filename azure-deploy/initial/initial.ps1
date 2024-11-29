@@ -8,16 +8,18 @@ param (
     [string]$DisplayName = "Quickstart AKS",
     [string]$AksSubscriptionId = "<YourSubscriptionID>",
     [string]$AksResourceGroup = "rg-k8s-dev-001",
-    [string]$AksRegion = "eastus", # Specify the region for the AKS resource group
+    [string]$aksClusterName = "latzok8s",
+    [string]$AksRegion = "switzerlandnorth",
     [string]$AcrSubscriptionId = "<YourSubscriptionID>",
     [string]$AcrResourceGroup = "rg-acr-dev-001",
     [string]$AcrName = "latzox",
     [string]$SshKeyName = "k8s-sshkey-dev-001",
-    [string]$GitHubOrg = "<GitHubOrg>",
-    [string]$RepoName = "<RepoName>",
-    [string]$EnvironmentName = "<EnvironmentName>",
-    [string]$repositoryName = "<your-repo-name>" # Replace with your repository name (e.g., 'username/repo')
-
+    [string]$GitHubOrg = "Latzox",
+    [string]$RepoName = "quickstart-azure-kubernetes-service",
+    [string]$EnvironmentName = "aks-prod",
+    [string]$dockerImageName = "quickstart-aks-py",
+    [string]$deploymentManifestPath = "./aks-deploy/deployment.yaml",
+    [string]$serviceManifestPath = "./aks-deploy/service.yaml"
 )
 
 # Helper function to set the subscription context
@@ -116,26 +118,43 @@ try {
 try {
 
     # Define the secrets and their values
-    # Replace "<value>" with the actual secret values
     $secrets = @{
-        "ENTRA_CLIENT_ID"         = $sp.AppId
-        "ENTRA_SUBSCRIPTION_ID"   = $AksSubscriptionId
-        "ENTRA_SUBSCRIPTION_ID_SS"= $AcrSubscriptionId
-        "ENTRA_TENANT_ID"         = (Get-AzContext).Tenant.Id
+        "ENTRA_CLIENT_ID"           = $sp.AppId
+        "ENTRA_SUBSCRIPTION_ID"     = $AksSubscriptionId
+        "ENTRA_SUBSCRIPTION_ID_SS"  = $AcrSubscriptionId
+        "ENTRA_TENANT_ID"           = (Get-AzContext).Tenant.Id
+    }
+
+    # Define the action variables and their values
+    $variables = @{
+        "AZURE_ACR_NAME"            = $AcrName
+        "DOCKER_IMAGE_NAME"         = $dockerImageName
+        "AKS_RG"                    = $AksResourceGroup
+        "AKS_CLUSTER_NAME"          = $aksClusterName
+        "DEPLOYMENT_MANIFEST_PATH"  = $deploymentManifestPath
+        "SERVICE_MANIFEST_PATH"     = $serviceManifestPath
     }
 
     # Iterate through each secret and create it using the GitHub CLI
     foreach ($secretName in $secrets.Keys) {
         $secretValue = $secrets[$secretName]
         Write-Host "Creating secret: $secretName"
-        gh secret set $secretName --body $secretValue --repo $repositoryName
+        gh secret set $secretName --body $secretValue --repo $RepoName
     }
-
     Write-Host "All secrets have been created successfully."
-} 
-catch {
-    Write-Error "Failed to create secrets in github: $_"
+
+    # Iterate through each variable and create it using the GitHub CLI
+    foreach ($variableName in $variables.Keys) {
+        $variableValue = $variables[$variableName]
+        Write-Host "Creating action variable: $variableName"
+        gh variable set $variableName --body $variableValue --repo $RepoName
+    }
+    Write-Host "All action variables have been created successfully."
+
+} catch {
+    Write-Error "Failed to create secrets or variables in GitHub: $_"
     exit 1
 }
+
 
 Write-Host "Script execution completed successfully!" -ForegroundColor Green
