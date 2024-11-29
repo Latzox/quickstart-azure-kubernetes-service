@@ -19,7 +19,7 @@ jobs:
 
   Preview:
     runs-on: ubuntu-latest
-    environment: preview
+    environment: infra-preview
 
     steps:
       - name: Checkout code
@@ -54,7 +54,7 @@ jobs:
             }
   Prod:
     runs-on: ubuntu-latest
-    environment: production
+    environment: infra-prod
     if: github.ref == 'refs/heads/main'
     needs: Preview
 
