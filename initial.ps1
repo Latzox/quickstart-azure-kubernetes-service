@@ -1,36 +1,48 @@
 # Script to Set Up AKS with ACR Integration and Federated Identity
-# Author: [Your Name]
-# Date: [Today's Date]
-# Description: This script creates an Azure AD service principal, configures federated identity for GitHub, deploys the AKS resource group, and assigns necessary roles for AKS and ACR integration across different subscriptions.
+# Author: Latzox
+# Date: 02-12-2024
+
+# Description:
+# This script creates an Azure AD service principal, 
+# configures federated identity for GitHub, 
+# deploys the AKS resource group, 
+# assigns necessary roles for AKS and ACR integration across different subscriptions,
+# and creates the GitHub secrets for authenticating your workflow to Entra ID.
+
+# Requirements:
+# - Authenticated with GitHub CLI
+# - Authenticated with Azure PowerShell
 
 # Parameters for customization
 param (
     [string]$DisplayName = "Quickstart AKS",
-    [string]$AksSubscriptionId = "<YourSubscriptionID>",
+    [string]$AksSubscriptionId = "<subscriptionId>",
     [string]$AksResourceGroup = "rg-k8s-dev-001",
     [string]$aksClusterName = "latzok8s",
     [string]$AksRegion = "switzerlandnorth",
-    [string]$AcrSubscriptionId = "<YourSubscriptionID>",
-    [string]$AcrResourceGroup = "rg-acr-dev-001",
+    [string]$AcrSubscriptionId = "<subscriptionId>",
+    [string]$AcrResourceGroup = "rg-acr-prod-001",
     [string]$AcrName = "latzox",
     [string]$SshKeyName = "k8s-sshkey-dev-001",
     [string]$GitHubOrg = "Latzox",
     [string]$RepoName = "quickstart-azure-kubernetes-service",
-    [string]$EnvironmentName = "aks-prod",
+    [string[]]$EnvironmentNames = @("aks-prod", "build", "infra-preview", "infra-prod"),
     [string]$dockerImageName = "quickstart-aks-py",
     [string]$deploymentManifestPath = "./aks-deploy/deployment.yaml",
     [string]$serviceManifestPath = "./aks-deploy/service.yaml"
 )
+
+$ErrorActionPreference = 'Stop'
 
 # Helper function to set the subscription context
 function Set-SubscriptionContext {
     param (
         [string]$SubscriptionId
     )
-    Write-Host "Selecting subscription context for '$SubscriptionId'..." -ForegroundColor Cyan
+    Write-Host "Selecting subscription context for '$SubscriptionId'..."
     try {
         Select-AzSubscription -SubscriptionId $SubscriptionId
-        Write-Host "Successfully set subscription context to '$SubscriptionId'." -ForegroundColor Green
+        Write-Host "Successfully set subscription context to '$SubscriptionId'."
     } catch {
         Write-Error "Failed to set subscription context: $_"
         exit 1
@@ -40,14 +52,14 @@ function Set-SubscriptionContext {
 # Step 1: Deploy the AKS Resource Group
 Set-SubscriptionContext -SubscriptionId $AksSubscriptionId
 try {
-    Write-Host "Creating or ensuring existence of AKS resource group..." -ForegroundColor Cyan
+    Write-Host "Checking if AKS resource group exists..."
     $aksResourceGroupExists = Get-AzResourceGroup -Name $AksResourceGroup -ErrorAction SilentlyContinue
 
     if (-not $aksResourceGroupExists) {
         New-AzResourceGroup -Name $AksResourceGroup -Location $AksRegion
-        Write-Host "AKS resource group '$AksResourceGroup' created successfully in region '$AksRegion'." -ForegroundColor Green
+        Write-Host "AKS resource group '$AksResourceGroup' created successfully in region '$AksRegion'."
     } else {
-        Write-Host "AKS resource group '$AksResourceGroup' already exists." -ForegroundColor Yellow
+        Write-Host "AKS resource group '$AksResourceGroup' already exists."
     }
 } catch {
     Write-Error "Failed to create or verify the AKS resource group: $_"
@@ -56,66 +68,112 @@ try {
 
 # Step 2: Create Azure AD Service Principal
 try {
-    Write-Host "Creating Azure AD Service Principal..." -ForegroundColor Cyan
-    $sp = New-AzADServicePrincipal -DisplayName $DisplayName -Role "Contributor" -Scope "/subscriptions/$AksSubscriptionId"
-    Write-Host "Service Principal created successfully. AppId: $($sp.AppId)" -ForegroundColor Green
+    Write-Host "Checking for existing Azure AD Service Principal..."
+    $existingSp = Get-AzADServicePrincipal -DisplayName $DisplayName -ErrorAction SilentlyContinue
+
+    if (-not $existingSp) {
+        $sp = New-AzADServicePrincipal -DisplayName $DisplayName -Role "Contributor" -Scope "/subscriptions/$AksSubscriptionId"
+        Write-Host "Service Principal created successfully. AppId: $($sp.AppId)"
+    } else {
+        $sp = $existingSp
+        Write-Host "Service Principal already exists. AppId: $($sp.AppId)"
+    }
 } catch {
-    Write-Error "Failed to create Service Principal: $_"
+    Write-Error "Failed to create or verify the Service Principal: $_"
     exit 1
 }
 
-# Step 3: Configure Federated Identity Credential for GitHub Actions
+# Step 3: Configure Federated Identity Credentials for GitHub Actions
 try {
-    Write-Host "Configuring Federated Identity Credential for GitHub Actions..." -ForegroundColor Cyan
-    $params = @{
-        ApplicationObjectId = $sp.Id
-        Audience = "api://AzureADTokenExchange"
-        Issuer = "https://token.actions.githubusercontent.com"
-        Name = "OIDC"
-        Subject = "repo:$GitHubOrg/$RepoName:environment:$EnvironmentName"
+    Write-Host "Checking and creating Federated Identity Credentials for GitHub Actions..."
+    
+    # Ensure EnvironmentNames is provided as an array
+    if (-not ($EnvironmentNames -is [System.Array])) {
+        Write-Error "EnvironmentNames must be an array of environment names."
+        exit 1
     }
-    New-AzADAppFederatedCredential @params
-    Write-Host "Federated Identity Credential configured successfully." -ForegroundColor Green
+
+    foreach ($envName in $EnvironmentNames) {
+        Write-Host "Processing environment: $envName"
+        
+        # Check if the federated credential already exists for this environment
+        $existingCredential = Get-AzADAppFederatedCredential -ApplicationObjectId (Get-AzADApplication -DisplayName "Quickstart AKS").Id -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -eq "OIDC-$envName" }
+        
+        if (-not $existingCredential) {
+            Write-Host "Creating Federated Identity Credential for environment '$envName'..."
+            $params = @{
+                ApplicationObjectId = (Get-AzADApplication -DisplayName $DisplayName).Id
+                Audience = "api://AzureADTokenExchange"
+                Issuer = "https://token.actions.githubusercontent.com"
+                Name = "OIDC-$envName"
+                Subject = "repo:$GitHubOrg/$($RepoName):environment:$($envName)"
+            }
+            New-AzADAppFederatedCredential @params
+            Write-Host "Federated Identity Credential for environment '$envName' configured successfully."
+        } else {
+            Write-Host "Federated Identity Credential for environment '$envName' already exists."
+        }
+    }
 } catch {
-    Write-Error "Failed to configure Federated Identity Credential: $_"
+    Write-Error "Failed to create or verify Federated Identity Credentials: $_"
     exit 1
 }
 
 # Step 4: Create an SSH Key in the AKS Resource Group
 try {
-    Write-Host "Creating SSH key in the resource group..." -ForegroundColor Cyan
-    New-AzSshKey -ResourceGroupName $AksResourceGroup -Name $SshKeyName
-    Write-Host "SSH key created successfully." -ForegroundColor Green
+    Write-Host "Checking for existing SSH key..."
+    $sshKey = Get-AzSshKey -ResourceGroupName $AksResourceGroup -Name $SshKeyName -ErrorAction SilentlyContinue
+
+    if (-not $sshKey) {
+        $sshKey = New-AzSshKey -ResourceGroupName $AksResourceGroup -Name $SshKeyName
+        Write-Host "SSH key created successfully."
+    } else {
+        Write-Host "SSH key '$SshKeyName' already exists in resource group '$AksResourceGroup'."
+    }
 } catch {
-    Write-Error "Failed to create SSH key: $_"
+    Write-Error "Failed to create or verify SSH key: $_"
     exit 1
 }
 
 # Step 5: Assign Roles for ACR and AKS Access
 Set-SubscriptionContext -SubscriptionId $AcrSubscriptionId
 try {
-    Write-Host "Assigning roles for ACR and AKS access..." -ForegroundColor Cyan
+    Write-Host "Checking and assigning roles for ACR and AKS access..."
 
-    # Define a condition for role assignments
-    $condition = "((!(ActionMatches{'Microsoft.Authorization/roleAssignments/write'})) OR (@Request[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {7f951dda-4ed3-4680-a7ca-43fe172d538d})) AND ((!(ActionMatches{'Microsoft.Authorization/roleAssignments/delete'})) OR (@Resource[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {7f951dda-4ed3-4680-a7ca-43fe172d538d}))"
+    # Check and assign the custom "Role Assignment Creator" role
+    $customRoleExists = Get-AzRoleAssignment -ObjectId $sp.Id -RoleDefinitionId "5d385d1a-a152-4e2d-b246-443d25882789" `
+        -Scope "/subscriptions/$AcrSubscriptionId/resourceGroups/$AcrResourceGroup" -ErrorAction SilentlyContinue
 
-    # Assign "Owner" role to the Service Principal in ACR resource group
-    New-AzRoleAssignment -ApplicationId $sp.AppId -RoleDefinitionName "Owner" `
-        -Scope "/subscriptions/$AcrSubscriptionId/resourceGroups/$AcrResourceGroup" `
-        -Condition $condition -ConditionVersion "2.0"
-    Write-Host "'Owner' role assigned successfully." -ForegroundColor Green
+    if (-not $customRoleExists) {
+        New-AzRoleAssignment -ObjectId $sp.Id -RoleDefinitionId "5d385d1a-a152-4e2d-b246-443d25882789" `
+            -Scope "/subscriptions/$AcrSubscriptionId/resourceGroups/$AcrResourceGroup"
+        Write-Host "'Role Assignment Creator' role assigned successfully."
+    } else {
+        Write-Host "'Role Assignment Creator' role already assigned."
+    }
 
-    # Assign "AcrPush" role to allow pushing images to ACR
-    New-AzRoleAssignment -ApplicationId $sp.AppId -RoleDefinitionName "AcrPush" `
-        -Scope "/subscriptions/$AcrSubscriptionId/resourceGroups/$AcrResourceGroup/providers/Microsoft.ContainerRegistry/registries/$AcrName"
-    Write-Host "'AcrPush' role assigned successfully." -ForegroundColor Green
+    # Check and assign the "AcrPush" role
+    $acrPushExists = Get-AzRoleAssignment -ObjectId $sp.Id -RoleDefinitionName "AcrPush" `
+        -Scope "/subscriptions/$AcrSubscriptionId/resourceGroups/$AcrResourceGroup/providers/Microsoft.ContainerRegistry/registries/$AcrName" `
+        -ErrorAction SilentlyContinue
+
+    if (-not $acrPushExists) {
+        New-AzRoleAssignment -ObjectId $sp.Id -RoleDefinitionName "AcrPush" `
+            -Scope "/subscriptions/$AcrSubscriptionId/resourceGroups/$AcrResourceGroup/providers/Microsoft.ContainerRegistry/registries/$AcrName"
+        Write-Host "'AcrPush' role assigned successfully."
+    } else {
+        Write-Host "'AcrPush' role already assigned."
+    }
 } catch {
     Write-Error "Failed to assign roles: $_"
     exit 1
 }
 
+
 # Step 6: Create the GitHub Actions Secrets
 try {
+    Write-Host "Creating or verifying GitHub Actions Secrets..."
 
     # Define the secrets and their values
     $secrets = @{
@@ -123,10 +181,7 @@ try {
         "ENTRA_SUBSCRIPTION_ID"     = $AksSubscriptionId
         "ENTRA_SUBSCRIPTION_ID_SS"  = $AcrSubscriptionId
         "ENTRA_TENANT_ID"           = (Get-AzContext).Tenant.Id
-    }
-
-    # Define the action variables and their values
-    $variables = @{
+        "AKS_PUBLIC_SSH_KEY"        = $sshKey.publicKey
         "AZURE_ACR_NAME"            = $AcrName
         "DOCKER_IMAGE_NAME"         = $dockerImageName
         "AKS_RG"                    = $AksResourceGroup
@@ -135,26 +190,16 @@ try {
         "SERVICE_MANIFEST_PATH"     = $serviceManifestPath
     }
 
-    # Iterate through each secret and create it using the GitHub CLI
     foreach ($secretName in $secrets.Keys) {
         $secretValue = $secrets[$secretName]
-        Write-Host "Creating secret: $secretName"
-        gh secret set $secretName --body $secretValue --repo $RepoName
+        Write-Host "Creating or updating secret: $secretName"
+        gh secret set $secretName --body $secretValue --repo "$($GitHubOrg)/$($RepoName)"
     }
-    Write-Host "All secrets have been created successfully."
-
-    # Iterate through each variable and create it using the GitHub CLI
-    foreach ($variableName in $variables.Keys) {
-        $variableValue = $variables[$variableName]
-        Write-Host "Creating action variable: $variableName"
-        gh variable set $variableName --body $variableValue --repo $RepoName
-    }
-    Write-Host "All action variables have been created successfully."
+    Write-Host "All secrets have been created or updated successfully."
 
 } catch {
-    Write-Error "Failed to create secrets or variables in GitHub: $_"
+    Write-Error "Failed to create or update secrets or variables in GitHub: $_"
     exit 1
 }
 
-
-Write-Host "Script execution completed successfully!" -ForegroundColor Green
+Write-Host "Script execution completed successfully!"
