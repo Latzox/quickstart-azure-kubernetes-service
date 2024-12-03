@@ -12,8 +12,8 @@ permissions:
   id-token: write
 
 env:
-  REGISTRY: ${{ vars.AZURE_ACR_NAME }}
-  IMAGE_NAME: ${{ vars.DOCKER_IMAGE_NAME }}
+  REGISTRY: ${{ secrets.AZURE_ACR_NAME }}
+  IMAGE_NAME: ${{ secrets.DOCKER_IMAGE_NAME }}
 
 jobs:
   build-and-push:

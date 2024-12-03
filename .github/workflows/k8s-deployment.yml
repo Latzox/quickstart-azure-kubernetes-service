@@ -11,12 +11,12 @@ on:
   workflow_dispatch:
 
 env:
-  AZURE_CONTAINER_REGISTRY: ${{ vars.AZURE_ACR_NAME }}
-  CONTAINER_NAME: ${{ vars.DOCKER_IMAGE_NAME }}
-  RESOURCE_GROUP: ${{ vars.AKS_RG }}
-  CLUSTER_NAME: ${{ vars.AKS_CLUSTER_NAME }}
-  DEPLOYMENT_MANIFEST_PATH: "./aks-deploy/deployment.yaml"
-  SERVICE_MANIFEST_PATH: "./aks-deploy/service.yaml"
+  AZURE_CONTAINER_REGISTRY: ${{ secrets.AZURE_ACR_NAME }}
+  CONTAINER_NAME: ${{ secrets.DOCKER_IMAGE_NAME }}
+  RESOURCE_GROUP: ${{ secrets.AKS_RG }}
+  CLUSTER_NAME: ${{ secrets.AKS_CLUSTER_NAME }}
+  DEPLOYMENT_MANIFEST_PATH: ${{ secrets.DEPLOYMENT_MANIFEST_PATH }}
+  SERVICE_MANIFEST_PATH: ${{ secrets.SERVICE_MANIFEST_PATH }}
 
 jobs:
   deploy:
