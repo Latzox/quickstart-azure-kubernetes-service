@@ -50,7 +50,7 @@ jobs:
             {
               "acrSubId": "${{ secrets.ENTRA_SUBSCRIPTION_ID_SS }}",
               "aksSubId": "${{ secrets.ENTRA_SUBSCRIPTION_ID }}",
-              "sshRSAPublicKey": "${{ secrets.PUBLIC_SSH_KEY }}"
+              "sshRSAPublicKey": "${{ secrets.AKS_PUBLIC_SSH_KEY }}"
             }
   Prod:
     runs-on: ubuntu-latest
@@ -87,5 +87,5 @@ jobs:
             {
               "acrSubId": "${{ secrets.ENTRA_SUBSCRIPTION_ID_SS }}",
               "aksSubId": "${{ secrets.ENTRA_SUBSCRIPTION_ID }}",
-              "sshRSAPublicKey": "${{ secrets.PUBLIC_SSH_KEY }}"
+              "sshRSAPublicKey": "${{ secrets.AKS_PUBLIC_SSH_KEY }}"
             }
