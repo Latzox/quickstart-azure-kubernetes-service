@@ -12,8 +12,8 @@ permissions:
   id-token: write
 
 env:
-  REGISTRY: ${{ vars.AZURE_ACR_NAME }}
-  IMAGE_NAME: ${{ vars.DOCKER_IMAGE_NAME }}
+  REGISTRY: ${{ secrets.AZURE_ACR_NAME }}
+  IMAGE_NAME: ${{ secrets.DOCKER_IMAGE_NAME }}
 
 jobs:
   build-and-push:
@@ -42,13 +42,13 @@ jobs:
         run: |
           cd app
           # Build the Docker image with a tag based on the commit SHA
-          docker build -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} .
+          docker build -t ${{ env.REGISTRY }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }} .
           
           # Push the image with the commit SHA tag
-          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          docker push ${{ env.REGISTRY }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }}
           
           # If running on the main branch, also tag and push as "latest"
           if [ "${{ github.ref_name }}" == "main" ]; then
-            docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-            docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            docker tag ${{ env.REGISTRY }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }} ${{ env.REGISTRY }}.azurecr.io/${{ env.IMAGE_NAME }}:latest
+            docker push ${{ env.REGISTRY }}.azurecr.io/${{ env.IMAGE_NAME }}:latest
           fi
