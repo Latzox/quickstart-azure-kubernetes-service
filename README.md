@@ -34,36 +34,35 @@ README.md                           # Documentation file (this file)
 ## How to use
 
 ### Clone the repository
-Use this template by creating a new repository. Even tho this template uses aks and acr azure services, you can use this template as a starting point for your project.
+Use this template to create a new repository. While this template is designed for AKS and ACR services in Azure, you can use it as a starting point for any similar project.
 
 ### Requirements
-Make sure you have the following set up. These are the requirements in order to deploy the neccessary resource with the scripts below.
+Ensure the following prerequisites are met before deploying the necessary resources using the scripts:
 
-- An Azure account with an active azure Subscription
+- An Azure account with an active Azure Subscription.
 - An Azure Container Registry (https://learn.microsoft.com/en-us/azure/container-registry/container-registry-get-started-powershell)
-- Azure PowerShell installed locally or access to Azure Cloud Shell https://shell.azure.com/
-- GitHub CLI installed locally or access to Azure Cloud Shell
+- Azure PowerShell installed locally or access to the Azure Cloud Shell https://shell.azure.com/
+- GitHub CLI installed locally or access to the Azure Cloud Shell.
 
-The tools you need are preinstalled in every Azure Cloud Shell instance.
+Note: Azure Cloud Shell comes preinstalled with all the required tools.
 
 ### Initial Azure setup
-I created a PowerShell function that does the intial setup on Azure and GitHub. It does the following:
+The PowerShell function `Setup-AzureProject` automates the initial setup in Azure and GitHub. It performs the following tasks:
 
-- Creates an Azure AD Service Principal for the GitHub Actions workflow.
-- Configures GitHub federated identity with Entra ID for secretless authentication in your pipelines.
-- Deploys the resource group for AKS.
+- Creates an Azure AD Service Principal for GitHub Actions workflows.
+- Configures GitHub federated identity with Entra ID for secretless authentication in pipelines.
+- Deploys the AKS resource group.
 - Assigns necessary Azure RBAC roles for AKS and ACR operations.
 - Configures GitHub repository secrets.
 
-You can use it by cloning your repository locally on your machine or into the Azure Cloud Shell. Make sure you're authenticated to your Azure subscription with Azure PowerShell and to your GitHub repo with GitHub CLI.
+You can run the script locally or directly in the Azure Cloud Shell. Ensure you're authenticated to your Azure subscription using Azure PowerShell and to your GitHub repository with the GitHub CLI.
 
-First, dot source the PowerShell script by running:
-
+#### Dot source the PowerShell script
 ```PowerShell
 . ./Setup-AzureProject.ps1
 ```
 
-Now you can call the function by running:
+#### Call the function with your parameters
 
 ```PowerShell
 Setup-AzureProject -DisplayName "Quickstart AKS" `
@@ -83,43 +82,52 @@ Setup-AzureProject -DisplayName "Quickstart AKS" `
 -EnvironmentNames @('aks-prod', 'build', 'infra-preview', 'infra-prod')
 
 ```
-The parameters are just an example of mine. You can replace it as you wish.
+Replace the example parameters above with your specific values.
 
 ### Run the GitHub Actions Pipelines
-I already created the necessary CI/CD pipelines in .github/workflows/ to deploy all resources.
+Preconfigured CI/CD pipelines in the .github/workflows/ directory handle resource deployments:
 
-- Docker Build and Push -> Creates a docker image of the Python flask app in /app.
-- Infra Deployment -> Creates the AKS cluster and the role assignments for pulling images from the Azure Container registry
-- K8s Deployment -> Creates a kubernetes application with the docker image and a service to expose the app to the public
+- Docker Build and Push: Builds a Docker image of the Python Flask app in /app and pushes it to ACR.
+- Infra Deployment: Creates the AKS cluster and assigns necessary roles for pulling images from ACR.
+- K8s Deployment: Deploys the Kubernetes application with the Docker image and exposes it using a public service.
 
-First, run the Docker Build and Push pipeline by navigating to your repository>Actions>Build and Push>Run workflow. After successful execution you can proceed with the Infra deployment and the K8s as last.
+#### Steps to Run Pipelines:
+1. Go to Repository > Actions > Build and Push > Run workflow to execute the Docker Build and Push pipeline.
+2. After a successful build, run the Infra Deployment workflow.
+3. Finally, execute the K8s Deployment workflow.
+
 
 ### Testing
-I suggest you to also have a look into the Azure Portal to see what kind of resources got deployed next to the AKS cluster itself.
+After deployment, explore the Azure Portal to review the resources created alongside the AKS cluster.
 
-Run the following command to view your docker image on the registry:
+#### Useful Commands:
+Check the Docker image in the registry:
+
 ```PowerShell
 Get-AzContainerRegistryRepository -RegistryName <RegistryName> -Name <DockerImageName>
 ```
 
-Run the following command to view your AKS cluster:
+Check the AKS cluster details:
+
 ```PowerShell
 Get-AzAksCluster -Name <AksClusterName> -ResourceGroupName <AksClusterResourceGroupName>
 ```
 
-Run the following command to connect to your AKS cluster:
+Connect to the AKS cluster:
 ```PowerShell
 Import-AzAksCredential -Name <AksClusterName> -ResourceGroupName <AksClusterResourceGroupName>
 ```
 
-Now you can manage the cluster with kubectl:
+Manage the cluster with kubectl:
 ```Bash
 kubectl get pods
 kubectl get service
 ```
-Now, with the service you'll see and external ip in your service named "aks-service". That's the IP you type into your browser to see the frontend of your Python flask app running in a container on the Azure Kubernetes Service.
 
-You successfully deployed the solution.
+#### Accessing the Deployed Application
+After running kubectl get service, locate the External IP for the service named aks-service. Open this IP address in your browser to view the Python Flask app running in a container on Azure Kubernetes Service.
+
+You have successfully deployed the solution! 🎉
 
 ## Contributing
 Feel free to open issues or create pull requests for enhancements and fixes.
