@@ -7,7 +7,7 @@ on:
   push:
     paths:
       - 'app/**'
-    workflow_dispatch:
+  workflow_dispatch:
 
 permissions: 
   id-token: write
