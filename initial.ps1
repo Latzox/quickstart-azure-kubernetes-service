@@ -1,45 +1,142 @@
-###############################################################################
-# Script Name: initial.ps1
-# Description: Automates the deployment and configuration of AKS with ACR 
-#              integration and GitHub federated identity for secure CI/CD workflows.
-# Author: Latzox
-# Date: 02-12-2024
-# Version: 1.0
-#
-# Features:
-# - Creates Azure AD Service Principal for authentication
-# - Configures GitHub federated identity with Azure AD
-# - Deploys the AKS resource group
-# - Assigns necessary Azure RBAC roles for AKS and ACR integration
-# - Configures GitHub repository secrets for authentication
-#
-# Requirements:
-# - Authenticated with GitHub CLI
-# - Authenticated with Azure PowerShell
-#
-# Usage:
-# Execute this script in an authenticated PowerShell session.
-# Ensure that GitHub CLI and Azure PowerShell modules are installed and configured.
-###############################################################################
+<#
+    .SYNOPSIS
+    Automates the deployment and configuration of AKS with ACR integration and GitHub federated identity for secure CI/CD workflows.
+
+    .DESCRIPTION
+    This script performs the following:
+    - Creates an Azure AD Service Principal for authentication.
+    - Configures GitHub federated identity with Azure AD for seamless CI/CD.
+    - Deploys an AKS resource group with ACR integration.
+    - Assigns necessary Azure RBAC roles for AKS and ACR operations.
+    - Configures GitHub repository secrets for secure authentication.
+
+    .PARAMETER DisplayName
+    The display name for the Azure AD Service Principal. Default: "Quickstart AKS".
+
+    .PARAMETER AksSubscriptionId
+    The subscription ID where the AKS cluster will be deployed.
+
+    .PARAMETER AksResourceGroup
+    The resource group name for the AKS cluster. Default: "rg-k8s-dev-001".
+
+    .PARAMETER AksClusterName
+    The name of the AKS cluster. Default: "latzok8s".
+
+    .PARAMETER AksRegion
+    The Azure region where the AKS cluster will be deployed. Default: "switzerlandnorth".
+
+    .PARAMETER AcrSubscriptionId
+    The subscription ID for the Azure Container Registry.
+
+    .PARAMETER AcrResourceGroup
+    The resource group name for the Azure Container Registry. Default: "rg-acr-prod-001".
+
+    .PARAMETER AcrName
+    The name of the Azure Container Registry. Default: "latzox".
+
+    .PARAMETER SshKeyName
+    The SSH key name for the AKS cluster. Default: "k8s-sshkey-dev-001".
+
+    .PARAMETER GitHubOrg
+    The GitHub organization name. Default: "Latzox".
+
+    .PARAMETER RepoName
+    The GitHub repository name for storing deployment manifests. Default: "quickstart-azure-kubernetes-service".
+
+    .PARAMETER EnvironmentNames
+    The list of environment names for GitHub workflows. Default: @("aks-prod", "build", "infra-preview", "infra-prod").
+
+    .PARAMETER DockerImageName
+    The name of the Docker image for deployment. Default: "quickstart-aks-py".
+
+    .PARAMETER DeploymentManifestPath
+    The path to the Kubernetes deployment manifest. Default: "./aks-deploy/deployment.yaml".
+
+    .PARAMETER ServiceManifestPath
+    The path to the Kubernetes service manifest. Default: "./aks-deploy/service.yaml".
+
+    .INPUTS
+    None. This script does not accept piped input.
+
+    .OUTPUTS
+    None. This script outputs information to the console during execution.
+
+    .EXAMPLE
+    To run the script with default parameters:
+    PS> .\initial.ps1
+
+    To run the script with custom parameters:
+    PS> .\initial.ps1 -DisplayName "Custom AKS" -AksSubscriptionId "your-sub-id" -AcrName "customacr"
+
+    .NOTES
+    Author: Latzox
+    Date: 02-12-2024
+    Version: 1.2
+
+    .LINK
+    https://github.com/Latzox/quickstart-azure-kubernetes-service
+#>
 
 
-# Parameters for customization
 param (
-    [string]$DisplayName = "Quickstart AKS",
-    [string]$AksSubscriptionId = "<subscriptionId>",
-    [string]$AksResourceGroup = "rg-k8s-dev-001",
-    [string]$AksClusterName = "latzok8s",
-    [string]$AksRegion = "switzerlandnorth",
-    [string]$AcrSubscriptionId = "<subscriptionId>",
-    [string]$AcrResourceGroup = "rg-acr-prod-001",
-    [string]$AcrName = "latzox",
-    [string]$SshKeyName = "k8s-sshkey-dev-001",
-    [string]$GitHubOrg = "Latzox",
-    [string]$RepoName = "quickstart-azure-kubernetes-service",
-    [string[]]$EnvironmentNames = @("aks-prod", "build", "infra-preview", "infra-prod"),
-    [string]$DockerImageName = "quickstart-aks-py",
-    [string]$DeploymentManifestPath = "./aks-deploy/deployment.yaml",
-    [string]$ServiceManifestPath = "./aks-deploy/service.yaml"
+    # Service Principal Parameters
+    [Parameter(Mandatory = $true, HelpMessage = "Display name for the Entra ID Service Principal.")]
+    [string]$DisplayName,
+
+    # AKS Parameters
+    [Parameter(Mandatory = $true, HelpMessage = "The subscription ID where the AKS cluster will be deployed.")]
+    [ValidateNotNullOrEmpty()]
+    [string]$AksSubscriptionId,
+
+    [Parameter(Mandatory = $true, HelpMessage = "The resource group name for the AKS cluster.")]
+    [ValidateNotNullOrEmpty()]
+    [string]$AksResourceGroup,
+
+    [Parameter(Mandatory = $true, HelpMessage = "The name of the AKS cluster.")]
+    [ValidateNotNullOrEmpty()]
+    [string]$AksClusterName,
+
+    [Parameter(Mandatory = $true, HelpMessage = "The Azure region where the AKS cluster will be deployed.")]
+    [string]$AksRegion,
+
+    [Parameter(Mandatory = $true, HelpMessage = "The path to the Kubernetes deployment manifest. (./aks-deploy/deployment.yaml)")]
+    [string]$DeploymentManifestPath,
+
+    [Parameter(Mandatory = $true, HelpMessage = "The path to the Kubernetes service manifest. (./aks-deploy/service.yaml)")]
+    [string]$ServiceManifestPath,
+
+    [Parameter(Mandatory = $true, HelpMessage = "The name of the Docker image for deployment.")]
+    [string]$DockerImageName,
+
+    # ACR Parameters
+    [Parameter(Mandatory = $true, HelpMessage = "The subscription ID for the Azure Container Registry.")]
+    [ValidateNotNullOrEmpty()]
+    [string]$AcrSubscriptionId,
+
+    [Parameter(Mandatory = $true, HelpMessage = "The resource group name for the Azure Container Registry.")]
+    [ValidateNotNullOrEmpty()]
+    [string]$AcrResourceGroup,
+
+    [Parameter(Mandatory = $true, HelpMessage = "The name of the Azure Container Registry.")]
+    [ValidateNotNullOrEmpty()]
+    [string]$AcrName,
+
+    # SSH Parameters
+    [Parameter(Mandatory = $true, HelpMessage = "The SSH key name for the AKS cluster.")]
+    [string]$SshKeyName,
+
+    # GitHub Parameters
+    [Parameter(Mandatory = $true, HelpMessage = "The GitHub organization name.")]
+    [ValidateNotNullOrEmpty()]
+    [string]$GitHubOrg,
+
+    [Parameter(Mandatory = $true, HelpMessage = "The GitHub repository name.")]
+    [ValidateNotNullOrEmpty()]
+    [string]$RepoName,
+
+    [Parameter(Mandatory = $true, HelpMessage = "List of environment names for GitHub workflows. For example: @('aks-prod', 'build', 'infra-preview', 'infra-prod')")]
+    [ValidateNotNullOrEmpty()]
+    [string[]]$EnvironmentNames
 )
 
 $ErrorActionPreference = 'Stop'
