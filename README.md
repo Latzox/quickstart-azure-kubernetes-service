@@ -34,6 +34,25 @@ README.md        # Documentation file (this file)
 ## How to use
 ### Initial Azure setup
 
+```PowerShell
+Setup-AzureProject -DisplayName "Quickstart AKS" `
+-AksSubscriptionId "<SubscriptionID>" `
+-AksResourceGroup "rg-k8s-dev-001" `
+-AksClusterName "latzok8s" `
+-AksRegion "switzerlandnorth" `
+-DeploymentManifestPath "./aks-deploy/deployment.yaml" `
+-ServiceManifestPath "./aks-deploy/service.yaml" `
+-DockerImageName "quickstart-aks-py" `
+-AcrSubscriptionId "<SubscriptionID>" `
+-AcrResourceGroup "rg-acr-prod-001" `
+-AcrName "latzox" ` 
+-SshKeyName "ssh-latzok8s-dev-001" ` 
+-GitHubOrg "Latzox" ` 
+-RepoName "quickstart-azure-kubernetes-service" ` 
+-EnvironmentNames @('aks-prod', 'build', 'infra-preview', 'infra-prod')
+
+```
+
 ## Contributing
 Feel free to open issues or create pull requests for enhancements and fixes.
 
