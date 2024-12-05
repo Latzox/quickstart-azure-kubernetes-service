@@ -63,8 +63,22 @@ function Setup-AzureProject {
         None. This script outputs verbose information to the console during execution.
 
         .EXAMPLE
-        PS> Setup-AzureProject -DisplayName "Custom AKS" -AksSubscriptionId "your-sub-id" -AcrName "customacr"
-
+        PS> Setup-AzureProject -DisplayName "Quickstart AKS" `
+                -AksSubscriptionId "<SubscriptionID>" `
+                -AksResourceGroup "rg-k8s-dev-001" `
+                -AksClusterName "latzok8s" `
+                -AksRegion "switzerlandnorth" `
+                -DeploymentManifestPath "./aks-deploy/deployment.yaml" `
+                -ServiceManifestPath "./aks-deploy/service.yaml" `
+                -DockerImageName "quickstart-aks-py" `
+                -AcrSubscriptionId "<SubscriptionID>" `
+                -AcrResourceGroup "rg-acr-prod-001" `
+                -AcrName "latzox" ` 
+                -SshKeyName "ssh-latzok8s-dev-001" ` 
+                -GitHubOrg "Latzox" ` 
+                -RepoName "quickstart-azure-kubernetes-service" ` 
+                -EnvironmentNames @('aks-prod', 'build', 'infra-preview', 'infra-prod')
+                
         .NOTES
         Author: Latzox
         Date: 02-12-2024
